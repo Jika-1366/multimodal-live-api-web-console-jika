@@ -18,8 +18,28 @@ import { useEffect, useRef, useState, memo } from "react";
 import vegaEmbed from "vega-embed";
 import { useLiveAPIContext } from "../../contexts/LiveAPIContext";
 import { ToolCall } from "../../multimodal-live-types";
+import "./Altair.css";
 
-const declaration: FunctionDeclaration = {
+const modalDeclaration: FunctionDeclaration = {
+  name: "show_modal",
+  description: "Shows a modal dialog with the specified text content.",
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {
+      title: {
+        type: SchemaType.STRING,
+        description: "Title of the modal dialog",
+      },
+      content: {
+        type: SchemaType.STRING,
+        description: "Content text to display in the modal",
+      },
+    },
+    required: ["content"],
+  },
+};
+
+const altairDeclaration: FunctionDeclaration = {
   name: "render_altair",
   description: "Displays an altair graph in json format.",
   parameters: {
@@ -37,6 +57,13 @@ const declaration: FunctionDeclaration = {
 
 function AltairComponent() {
   const [jsonString, setJSONString] = useState<string>("");
+  const [modalState, setModalState] = useState<{
+    isOpen: boolean;
+    title?: string;
+    content?: string;
+  }>({
+    isOpen: false,
+  });
   const { client, setConfig } = useLiveAPIContext();
 
   useEffect(() => {
@@ -51,14 +78,13 @@ function AltairComponent() {
       systemInstruction: {
         parts: [
           {
-            text: 'You are my helpful assistant. Any time I ask you for a graph call the "render_altair" function I have provided you. Dont ask for additional information just make your best judgement.',
+            text: 'You are my helpful assistant. You can show graphs using the "render_altair" function and display modal dialogs using the "show_modal" function. Make your best judgment about when to use each.',
           },
         ],
       },
       tools: [
-        // there is a free-tier quota for search
         { googleSearch: {} },
-        { functionDeclarations: [declaration] },
+        { functionDeclarations: [altairDeclaration, modalDeclaration] },
       ],
     });
   }, [setConfig]);
@@ -66,15 +92,30 @@ function AltairComponent() {
   useEffect(() => {
     const onToolCall = (toolCall: ToolCall) => {
       console.log(`got toolcall`, toolCall);
-      const fc = toolCall.functionCalls.find(
-        (fc) => fc.name === declaration.name,
+
+      // Handle modal display
+      const modalCall = toolCall.functionCalls.find(
+        (fc) => fc.name === modalDeclaration.name,
       );
-      if (fc) {
-        const str = (fc.args as any).json_graph;
+      if (modalCall) {
+        const args = modalCall.args as any;
+        setModalState({
+          isOpen: true,
+          title: args.title,
+          content: args.content,
+        });
+      }
+
+      // Handle graph display
+      const graphCall = toolCall.functionCalls.find(
+        (fc) => fc.name === altairDeclaration.name,
+      );
+      if (graphCall) {
+        const str = (graphCall.args as any).json_graph;
         setJSONString(str);
       }
-      // send data for the response of your tool call
-      // in this case Im just saying it was successful
+
+      // Send response for all function calls
       if (toolCall.functionCalls.length) {
         setTimeout(
           () =>
@@ -101,7 +142,21 @@ function AltairComponent() {
       vegaEmbed(embedRef.current, JSON.parse(jsonString));
     }
   }, [embedRef, jsonString]);
-  return <div className="vega-embed" ref={embedRef} />;
+
+  return (
+    <div className="altair-container">
+      <div className="vega-embed" ref={embedRef} />
+      {modalState.isOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            {modalState.title && <h2>{modalState.title}</h2>}
+            <p>{modalState.content}</p>
+            <button onClick={() => setModalState({ isOpen: false })}>Close</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export const Altair = memo(AltairComponent);
