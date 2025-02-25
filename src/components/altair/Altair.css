@@ -38,16 +38,54 @@
   line-height: 1.5;
 }
 
-.modal-content button {
-  background-color: #007bff;
-  color: white;
-  border: none;
+.modal-input {
+  width: 100%;
+  padding: 8px 12px;
+  margin-bottom: 16px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.modal-input:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.modal-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.modal-buttons button {
   padding: 8px 16px;
+  border: none;
   border-radius: 4px;
   cursor: pointer;
   transition: background-color 0.2s;
 }
 
-.modal-content button:hover {
+.modal-buttons button:first-child {
+  background-color: #007bff;
+  color: white;
+}
+
+.modal-buttons button:first-child:hover {
   background-color: #0056b3;
+}
+
+.modal-buttons button:first-child:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+.modal-buttons .cancel-button {
+  background-color: #6c757d;
+  color: white;
+}
+
+.modal-buttons .cancel-button:hover {
+  background-color: #5a6268;
 }

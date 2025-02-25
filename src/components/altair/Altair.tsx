@@ -61,6 +61,8 @@ function AltairComponent() {
     isOpen: boolean;
     title?: string;
     content?: string;
+    functionCallId?: string;
+    userInput?: string;
   }>({
     isOpen: false,
   });
@@ -70,10 +72,12 @@ function AltairComponent() {
     setConfig({
       model: "models/gemini-2.0-flash-exp",
       generationConfig: {
-        responseModalities: "audio",
-        speechConfig: {
-          voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } },
-        },
+        responseModalities: "text",  // テキストモード
+        // 音声モードに切り替える場合は、以下のコメントを解除し、上のtextをコメントアウト
+        // responseModalities: "audio",
+        // speechConfig: {
+        //   voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } },
+        // },
       },
       systemInstruction: {
         parts: [
@@ -103,7 +107,9 @@ function AltairComponent() {
           isOpen: true,
           title: args.title,
           content: args.content,
+          functionCallId: modalCall.id,
         });
+        return; // 追加: モーダル表示時は即座にレスポンスを返さない
       }
 
       // Handle graph display
@@ -115,18 +121,23 @@ function AltairComponent() {
         setJSONString(str);
       }
 
-      // Send response for all function calls
+      // Send response for all function calls except modal
       if (toolCall.functionCalls.length) {
-        setTimeout(
-          () =>
-            client.sendToolResponse({
-              functionResponses: toolCall.functionCalls.map((fc) => ({
-                response: { output: { success: true } },
-                id: fc.id,
-              })),
-            }),
-          200,
+        const nonModalCalls = toolCall.functionCalls.filter(
+          (fc) => fc.name !== modalDeclaration.name
         );
+        if (nonModalCalls.length > 0) {
+          setTimeout(
+            () =>
+              client.sendToolResponse({
+                functionResponses: nonModalCalls.map((fc) => ({
+                  response: { output: { success: true } },
+                  id: fc.id,
+                })),
+              }),
+            200,
+          );
+        }
       }
     };
     client.on("toolcall", onToolCall);
@@ -134,6 +145,19 @@ function AltairComponent() {
       client.off("toolcall", onToolCall);
     };
   }, [client]);
+
+  // 追加: モーダルでの入力を処理する関数
+  const handleModalSubmit = () => {
+    if (modalState.functionCallId && modalState.userInput) {
+      client.sendToolResponse({
+        functionResponses: [{
+          response: { output: { success: true, userInput: modalState.userInput } },
+          id: modalState.functionCallId,
+        }],
+      });
+      setModalState({ isOpen: false });  // モーダルを閉じる
+    }
+  };
 
   const embedRef = useRef<HTMLDivElement>(null);
 
@@ -151,7 +175,17 @@ function AltairComponent() {
           <div className="modal-content">
             {modalState.title && <h2>{modalState.title}</h2>}
             <p>{modalState.content}</p>
-            <button onClick={() => setModalState({ isOpen: false })}>Close</button>
+            <input
+              type="text"
+              value={modalState.userInput || ""}
+              onChange={(e) => setModalState(prev => ({ ...prev, userInput: e.target.value }))}
+              placeholder="合言葉を入力してください"
+              className="modal-input"
+            />
+            <div className="modal-buttons">
+              <button onClick={handleModalSubmit} disabled={!modalState.userInput}>送信</button>
+              <button onClick={() => setModalState({ isOpen: false })} className="cancel-button">キャンセル</button>
+            </div>
           </div>
         </div>
       )}
