@@ -146,15 +146,11 @@ function AltairComponent() {
     };
   }, [client]);
 
-  // 追加: モーダルでの入力を処理する関数
+  // モーダルでの入力を処理する関数
   const handleModalSubmit = () => {
-    if (modalState.functionCallId && modalState.userInput) {
-      client.sendToolResponse({
-        functionResponses: [{
-          response: { output: { success: true, userInput: modalState.userInput } },
-          id: modalState.functionCallId,
-        }],
-      });
+    if (modalState.userInput) {
+      // ユーザーの入力を直接LLMに送信
+      client.send({ text: modalState.userInput });
       setModalState({ isOpen: false });  // モーダルを閉じる
     }
   };
